@@ -41,8 +41,8 @@
 
 (defvar cnstock--counter 0 "Loop counter")
 (defvar cnstock--counter-list ())
-(defvar cnstock--update-timer nil)
-(defvar cnstock--display-timer nil)
+(defvar cnstock-quotation--update-timer nil)
+(defvar cnstock-quotation--display-timer nil)
 (defvar cnstock--buffer nil)
 (defvar cnstock--quit nil)
 
@@ -216,11 +216,10 @@ CnStock buffer is BUFFER"
       (url-retrieve-synchronously "http://hq.sinajs.cn/?format=text&list=sz000001,sz000002")
     (progn
       (goto-char (point-min))
-      (re-search-forward "sz000002")
+      (re-search-forward "[\n\t\r]\\{2,\\}")
       (delete-region (point) (point-min))
       (cnstock-quotation--parse (buffer-string))
       (kill-buffer))))
-
 
 ;;
 ;; Provided commands
@@ -234,78 +233,21 @@ CnStock buffer is BUFFER"
         (insert (format "%s" cnstock-global--current-quotation)))))
 
 (defun cnstock-start-timers ()
-  ;;(setq cnstock--counter 0)
-  ;;(setq cnstock--counter-list ())
   (setq cnstock-global--current-quotation ())
-  (when cnstock--update-timer (cancel-timer cnstock--update-timer))
-  (when cnstock--display-timer (cancel-timer cnstock--display-timer))
-  (setq cnstock--update-timer
+  (when cnstock-quotation--update-timer (cancel-timer cnstock-quotation--update-timer))
+  (when cnstock-quotation--display-timer (cancel-timer cnstock-quotation--display-timer))
+  (setq cnstock-quotation--update-timer
         (run-at-time nil 5 'cnstock-quotation--url-retrive))
-  (setq cnstock--display-timer
+  (setq cnstock-quotation--display-timer
         (run-at-time nil 5 'cnstock-quotation--display)))
 
 (defun cnstock-stop-timers ()
-  (when cnstock--update-timer (cancel-timer cnstock--update-timer))
-  (when cnstock--display-timer (cancel-timer cnstock--display-timer))
+  (when cnstock-quotation--update-timer (cancel-timer cnstock-quotation--update-timer))
+  (when cnstock-quotation--display-timer (cancel-timer cnstock-quotation--display-timer))
   (setq cnstock-global--current-quotation ()
-        cnstock--update-timer nil
-        cnstock--display-timer nil
+        cnstock-quotation--update-timer nil
+        cnstock-quotation--display-timer nil
         cnstock-global--quit-flag nil))
-
-;;
-;; Emacs lisp testing methods
-;;
-(defun cnstock-quit ()
-  (when cnstock--update-timer (cancel-timer cnstock--update-timer))
-  (when cnstock--display-timer (cancel-timer cnstock--display-timer))
-  (kill-buffer cnstock--buffer)
-  (setq cnstock--counter 0
-        cnstock--counter-list ()
-        cnstock--update-timer nil
-        cnstock--display-timer nil
-        cnstock--buffer nil
-        cnstock--quit nil))
-
-(defun reflush-buffer ()
-  (interactive)
-  (if cnstock--quit (cnstock-quit)
-    (erase-buffer)
-    (insert (format "%s" cnstock--counter-list)))
-  )
-
-(defun increament-counter ()
-  "Construct a counter list"
-  (setq cnstock--counter (1+ cnstock--counter))
-  (setq cnstock--counter-list (cons cnstock--counter cnstock--counter-list))
-  )
-
-(defun test-run-at-time ()
-  (setq cnstock--counter 0)
-  (setq cnstock--counter-list ())
-  (when cnstock--update-timer (cancel-timer cnstock--update-timer))
-  (when cnstock--display-timer (cancel-timer cnstock--display-timer))
-  (setq cnstock--update-timer
-        (run-at-time nil 5 'increament-counter))
-  (setq cnstock--display-timer
-        (run-at-time nil 5 'reflush-buffer)))
-
-;;;###autoload
-(defun cnstock ()
-  "cnstock testing"
-  (interactive)
-  (if (not cnstock--buffer)
-      (setq cnstock--buffer (generate-new-buffer "cnstock")))
-  (switch-to-buffer cnstock--buffer)
-  (test-run-at-time)
-  (reflush-buffer)
-  )
-
-;;;###autoload
-(defun cnstock-test ()
-  "cnstock testing"
-  (interactive)
-  (setq cnstock--quit t)
-  )
 
 ;;;###autoload
 (defun cnstock-toggle ()
