@@ -36,7 +36,6 @@
 ;;
 (defvar cnstock-global--window nil)
 (defvar cnstock-global--buffer nil)
-(defvar cnstock-global--quit-flag nil)
 (defvar cnstock-global--current-quotation ())
 
 (defvar cnstock--counter 0 "Loop counter")
@@ -221,21 +220,23 @@ CnStock buffer is BUFFER"
       (cnstock-quotation--parse (buffer-string))
       (kill-buffer))))
 
+(defun cnstock-quotation--display ()
+  "Update stock quotation in cnstock-global--buffer."
+  (if cnstock-global--current-quotation
+      (cnstock-buffer--with-editing-buffer
+       (erase-buffer)
+       (insert (format "%s" cnstock-global--current-quotation)))))
+
 ;;
 ;; Provided commands
 ;;
-
-(defun cnstock-quotation--display ()
-  "Update stock quotation in cnstock-global--buffer."
-  (if (not cnstock-global--quit-flag)
-      (cnstock-buffer--with-editing-buffer
-        (erase-buffer)
-        (insert (format "%s" cnstock-global--current-quotation)))))
 
 (defun cnstock-start-timers ()
   (setq cnstock-global--current-quotation ())
   (when cnstock-quotation--update-timer (cancel-timer cnstock-quotation--update-timer))
   (when cnstock-quotation--display-timer (cancel-timer cnstock-quotation--display-timer))
+  (cnstock-quotation--url-retrive)
+  (cnstock-quotation--display)
   (setq cnstock-quotation--update-timer
         (run-at-time nil 5 'cnstock-quotation--url-retrive))
   (setq cnstock-quotation--display-timer
@@ -246,8 +247,7 @@ CnStock buffer is BUFFER"
   (when cnstock-quotation--display-timer (cancel-timer cnstock-quotation--display-timer))
   (setq cnstock-global--current-quotation ()
         cnstock-quotation--update-timer nil
-        cnstock-quotation--display-timer nil
-        cnstock-global--quit-flag nil))
+        cnstock-quotation--display-timer nil))
 
 ;;;###autoload
 (defun cnstock-toggle ()
