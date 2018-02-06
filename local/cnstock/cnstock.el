@@ -207,12 +207,37 @@ CnStock buffer is BUFFER"
 
 (defun cnstock-quotation--parse (response)
   "Parse stock quotation from Sina."
-  (setq cnstock-global--current-quotation response))
+  (let ((rlt nil)
+        (quotation-list (split-string response "\n")))
+    (dolist (element quotation-list rlt)
+      (if (not (string-match "^[[:blank:]]*$" element))
+          (setq rlt (concat rlt (cnstock-quotation--parse-stock element)))))
+          ;;(setq rlt (cons (split-string element ",") rlt)))
+    (setq cnstock-global--current-quotation rlt)))
+
+(defun cnstock-quotation--parse-stock (data)
+  "Parse one stock's quotation data and format to a string"
+  (let* (rlt
+         (data-list (split-string (decode-coding-string data 'gbk) ","))
+         (nth-float-value-from-datalist
+          (lambda (idx) (string-to-number (nth idx data-list))))
+         (id-name-str (split-string (car data-list) "="))
+         (id (car id-name-str))
+         (name (nth 1 id-name-str))
+         (open (funcall nth-float-value-from-datalist 1))
+         (close (funcall nth-float-value-from-datalist 2))
+         (now (funcall nth-float-value-from-datalist 3))
+         (high (funcall nth-float-value-from-datalist 4))
+         (low (funcall nth-float-value-from-datalist 5))
+         (percentage (* 100 (/ (- now close) close)))
+         )
+    (format "%s %-8s %-6.3f %-6.3f %-6.3f %-6.3f%%\n"
+            id name open close now percentage)))
 
 (defun cnstock-quotation--url-retrive ()
   "Retrive stock quotation from Sina."
   (with-current-buffer
-      (url-retrieve-synchronously "http://hq.sinajs.cn/?format=text&list=sz000001,sz000002")
+      (url-retrieve-synchronously "http://hq.sinajs.cn/?format=text&list=sz000001,sz000002,sz300059,sh601939")
     (progn
       (goto-char (point-min))
       (re-search-forward "[\n\t\r]\\{2,\\}")
