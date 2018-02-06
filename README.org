@@ -20,9 +20,10 @@ file.
 
 * Key bindings
 
-| Key Binding | Description    |
-|-------------+----------------|
-| ~SPC x x x~ | Does thing01   |
+| Key Binding | Description                                                                 |
+|-------------+-----------------------------------------------------------------------------|
+| ~SPC a t~   | Toggle the China stock quotation window to display the live stock quotation |
+| ~C-c C-c~   | Hide the stock quotation window                                                |
 # Use GitHub URLs if you wish to link a Spacemacs documentation file or its heading.
 # Examples:
 # [[https://github.com/syl20bnr/spacemacs/blob/master/doc/VIMUSERS.org#sessions]]
