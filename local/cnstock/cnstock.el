@@ -277,13 +277,19 @@ CnStock buffer is BUFFER"
 
 (defun cnstock-quotation--format-to-string (data)
   "Format one stock's quotation data to string."
-  (format "%s %-8s %-6.3f %-6.3f %-6.3f %6.3f%%\n"
-          (pop data)
-          (pop data)
-          (pop data)
-          (pop data)
-          (pop data)
-          (pop data)))
+  (format "%s %-8s %-8.3f %5.3f%%\n"
+          (nth 0 data)
+          (nth 1 data)
+          (nth 4 data)
+          (nth 5 data)
+          ))
+  ;;(format "%s %-8s %-7.3f %-7.3f %-7.3f %7.3f%%\n"
+  ;;        (pop data)
+  ;;        (pop data)
+  ;;        (pop data)
+  ;;        (pop data)
+  ;;        (pop data)
+  ;;        (pop data)))
 
 (defun cnstock-quotation--url-retrive ()
   "Retrive stock quotation from Sina."
