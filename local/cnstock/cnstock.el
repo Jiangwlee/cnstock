@@ -30,20 +30,25 @@
 ;; Constants
 ;;
 (defconst cnstock-buffer-name " *CnStock*")
+(defconst cnstock-global--url "http://hq.sinajs.cn/?format=text&list=")
 
 ;;
 ;; Variables
 ;;
 (defvar cnstock-global--window nil)
 (defvar cnstock-global--buffer nil)
-(defvar cnstock-global--current-quotation ())
+(defvar cnstock-global--current-quotation-string nil)
+(defvar cnstock-global--current-quotation-list ())
 
-(defvar cnstock--counter 0 "Loop counter")
-(defvar cnstock--counter-list ())
 (defvar cnstock-quotation--update-timer nil)
 (defvar cnstock-quotation--display-timer nil)
-(defvar cnstock--buffer nil)
-(defvar cnstock--quit nil)
+
+(defvar tabulated-list-format nil "Buffer local variable for tabulated list")
+(defvar tabulated-list-entries nil "Buffer local variable for tabulated list")
+(defvar tabulated-list-sort-key nil "Buffer local variable for tabulated list")
+(declare-function tabulated-list-init-header "tabulated-list" ())
+(declare-function tabulated-list-print "tabulated-list"
+                  (&optional remember-pos update))
 
 ;;
 ;; Customization
@@ -57,6 +62,17 @@
   "*If the cnstock windows is fixed, it won't be resize when rebalance windows."
   :type 'boolean
   :group 'cnstock)
+
+(defcustom cnstock-tabulated-mode-enabled t
+  "*If tabulated mode is enabled, the stock quotation will be displayed in a tabulated list"
+  :type 'boolean
+  :group 'cnstock)
+
+(defcustom cnstock-stock-code-list "sh000001,sz399106,sz399006,sz000001,sz000002,sz300059,sh601939"
+  "*Stock code list."
+  :type '(string)
+  :group 'cnstock)
+
 
 ;;
 ;; Macros
@@ -114,6 +130,7 @@
 ;;
 ;; Major mode definitions
 ;;
+
 (defvar cnstock-mode-map
   (let ((map (make-sparse-keymap)))
     (define-key map (kbd "C-c C-c") 'cnstock-hide)
@@ -123,9 +140,26 @@
 (define-derived-mode cnstock-mode special-mode "CnStock"
   "A major mode for displaying the China stock quotation")
 
+(define-derived-mode cnstock-tabulated-mode tabulated-list-mode "CnStock Tabulated"
+  "Major mode for listing the CnStock quotation."
+  (setq tabulated-list-format [("Code" 8 t)
+                               ("Name" 8 t)
+                               ("Open" 8 t)
+                               ("Close" 8 t)
+                               ("Now" 8 t)
+                               ("Percentage" 8 cnstock-quotation--compare-float-entries)])
+  (setq tabulated-list-sort-key (cons "Percentage" nil))
+  (tabulated-list-init-header))
+
 ;;
 ;; Global methods
 ;;
+
+(defun cnstock-global--get-url ()
+  "Return the url to retrive stock quotation."
+  (interactive)
+  (concat cnstock-global--url cnstock-stock-code-list))
+
 (defun cnstock-global--window-exists-p ()
   "Return non-nil if cnstock window exists."
   (and (not (null (window-buffer cnstock-global--window)))
@@ -177,7 +211,8 @@ _ALIST is ignored."
   "Create and switch to cnstock buffer."
   (switch-to-buffer
    (generate-new-buffer-name cnstock-buffer-name))
-  (cnstock-mode)
+  (if cnstock-tabulated-mode-enabled (cnstock-tabulated-mode)
+    (cnstock-mode))
   (current-buffer))
 
 (defun cnstock-buffer--lock-width ()
@@ -208,12 +243,17 @@ CnStock buffer is BUFFER"
 (defun cnstock-quotation--parse (response)
   "Parse stock quotation from Sina."
   (let ((rlt nil)
+        (tmp nil)
+        (current-quotation-list ())
         (quotation-list (split-string response "\n")))
     (dolist (element quotation-list rlt)
       (if (not (string-match "^[[:blank:]]*$" element))
-          (setq rlt (concat rlt (cnstock-quotation--parse-stock element)))))
-          ;;(setq rlt (cons (split-string element ",") rlt)))
-    (setq cnstock-global--current-quotation rlt)))
+          (progn
+            (setq tmp (cnstock-quotation--parse-stock element))
+            (setq rlt (concat rlt (cnstock-quotation--format-to-string tmp)))
+            (setq current-quotation-list (cons tmp current-quotation-list)))))
+    (setq cnstock-global--current-quotation-string rlt)
+    (setq cnstock-global--current-quotation-list (reverse current-quotation-list))))
 
 (defun cnstock-quotation--parse-stock (data)
   "Parse one stock's quotation data and format to a string"
@@ -231,13 +271,24 @@ CnStock buffer is BUFFER"
          (low (funcall nth-float-value-from-datalist 5))
          (percentage (* 100 (/ (- now close) close)))
          )
-    (format "%s %-8s %-6.3f %-6.3f %-6.3f %-6.3f%%\n"
-            id name open close now percentage)))
+    (list id name open close now percentage)))
+    ;;(format "%s %-8s %-6.3f %-6.3f %-6.3f %6.3f%%\n"
+     ;;       id name open close now percentage)))
+
+(defun cnstock-quotation--format-to-string (data)
+  "Format one stock's quotation data to string."
+  (format "%s %-8s %-6.3f %-6.3f %-6.3f %6.3f%%\n"
+          (pop data)
+          (pop data)
+          (pop data)
+          (pop data)
+          (pop data)
+          (pop data)))
 
 (defun cnstock-quotation--url-retrive ()
   "Retrive stock quotation from Sina."
   (with-current-buffer
-      (url-retrieve-synchronously "http://hq.sinajs.cn/?format=text&list=sz000001,sz000002,sz300059,sh601939")
+      (url-retrieve-synchronously (cnstock-global--get-url))
     (progn
       (goto-char (point-min))
       (re-search-forward "[\n\t\r]\\{2,\\}")
@@ -247,17 +298,38 @@ CnStock buffer is BUFFER"
 
 (defun cnstock-quotation--display ()
   "Update stock quotation in cnstock-global--buffer."
-  (if cnstock-global--current-quotation
+  (if cnstock-global--current-quotation-string
       (cnstock-buffer--with-editing-buffer
-       (erase-buffer)
-       (insert (format "%s" cnstock-global--current-quotation)))))
+       (if cnstock-tabulated-mode-enabled (cnstock-quotation--tabulated-display)
+         (cnstock-quotation--normal-display)))))
 
+(defun cnstock-quotation--normal-display ()
+  "Dispaly CnStock quotation in cnstock-mode."
+  (erase-buffer)
+  (insert (format "%s" cnstock-global--current-quotation-string)))
+
+(defun cnstock-quotation--tabulated-display ()
+  "Display CnStock quotation in cnstock-tabulated-mode."
+  (setq tabulated-list-entries nil)
+  (dolist (element cnstock-global--current-quotation-list)
+    (setq element (mapcar
+                   (lambda (arg)
+                     (if (floatp arg) (format "%-8.3f" arg) (format "%-8s" arg)))
+                   element))
+    (push (list element (vconcat element nil)) tabulated-list-entries))
+  (tabulated-list-print))
+
+(defun cnstock-quotation--compare-float-entries (arg1 arg2)
+  "Compare two tabulated entries whoes value is a float string."
+  (let ((fval1 (string-to-number (elt (nth -1 arg1) 5)))
+        (fval2 (string-to-number (elt (nth -1 arg2) 5))))
+    (> fval1 fval2)))
 ;;
 ;; Provided commands
 ;;
 
 (defun cnstock-start-timers ()
-  (setq cnstock-global--current-quotation ())
+  (setq cnstock-global--current-quotation-string nil)
   (when cnstock-quotation--update-timer (cancel-timer cnstock-quotation--update-timer))
   (when cnstock-quotation--display-timer (cancel-timer cnstock-quotation--display-timer))
   (cnstock-quotation--url-retrive)
@@ -270,7 +342,7 @@ CnStock buffer is BUFFER"
 (defun cnstock-stop-timers ()
   (when cnstock-quotation--update-timer (cancel-timer cnstock-quotation--update-timer))
   (when cnstock-quotation--display-timer (cancel-timer cnstock-quotation--display-timer))
-  (setq cnstock-global--current-quotation ()
+  (setq cnstock-global--current-quotation-string nil
         cnstock-quotation--update-timer nil
         cnstock-quotation--display-timer nil))
 
