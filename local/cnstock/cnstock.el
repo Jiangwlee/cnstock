@@ -277,11 +277,12 @@ CnStock buffer is BUFFER"
 
 (defun cnstock-quotation--format-to-string (data)
   "Format one stock's quotation data to string."
-  (format "%s %-8s %-8.3f %5.3f%%\n"
+  (format "%s %-8s %-8.3f %+5.3f%% %s\n"
           (nth 0 data)
           (nth 1 data)
           (nth 4 data)
           (nth 5 data)
+          (if (< (nth 5 data) 0) "↓" "↑")
           ))
   ;;(format "%s %-8s %-7.3f %-7.3f %-7.3f %7.3f%%\n"
   ;;        (pop data)
