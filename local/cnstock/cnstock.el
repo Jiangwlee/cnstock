@@ -156,7 +156,7 @@
 ;;
 
 (defun cnstock-global--get-url ()
-  "Return the url to retrive stock quotation."
+  "Return the url to retrieve stock quotation."
   (interactive)
   (concat cnstock-global--url cnstock-stock-code-list))
 
@@ -292,10 +292,10 @@ CnStock buffer is BUFFER"
   ;;        (pop data)
   ;;        (pop data)))
 
-(defun cnstock-quotation--url-retrive ()
-  "Retrive stock quotation from Sina."
+(defun cnstock-quotation--url-retrieve ()
+  "Retrieve stock quotation from Sina."
   (with-current-buffer
-      (url-retrieve-synchronously (cnstock-global--get-url))
+      (url-retrieve-synchronously (cnstock-global--get-url) t)
     (progn
       (goto-char (point-min))
       (re-search-forward "[\n\t\r]\\{2,\\}")
@@ -339,10 +339,10 @@ CnStock buffer is BUFFER"
   (setq cnstock-global--current-quotation-string nil)
   (when cnstock-quotation--update-timer (cancel-timer cnstock-quotation--update-timer))
   (when cnstock-quotation--display-timer (cancel-timer cnstock-quotation--display-timer))
-  (cnstock-quotation--url-retrive)
+  (cnstock-quotation--url-retrieve)
   (cnstock-quotation--display)
   (setq cnstock-quotation--update-timer
-        (run-at-time nil 5 'cnstock-quotation--url-retrive))
+        (run-at-time nil 5 'cnstock-quotation--url-retrieve))
   (setq cnstock-quotation--display-timer
         (run-at-time nil 5 'cnstock-quotation--display)))
 
